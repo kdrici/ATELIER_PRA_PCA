@@ -15,11 +15,13 @@ spec:
     spec:
       containers:
         - name: flask
-          image: pra/flask-sqlite:1.0
-          imagePullPolicy: IfNotPresent
+          image: docker.io/pra/flask-sqlite:2.0
+          imagePullPolicy: Never
           env:
             - name: DB_PATH
               value: /data/app.db
+            - name: BACKUP_DIR
+              value: /backup
           ports:
             - containerPort: 8080
           command: ["/bin/sh","-lc"]
@@ -29,7 +31,12 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: backup        # ✅ AJOUTÉ
+              mountPath: /backup  # ✅ AJOUTÉ
       volumes:
         - name: data
           persistentVolumeClaim:
             claimName: pra-data
+        - name: backup            # ✅ AJOUTÉ
+          persistentVolumeClaim:  # ✅ AJOUTÉ
+            claimName: pra-backup # ✅ AJOUTÉ
