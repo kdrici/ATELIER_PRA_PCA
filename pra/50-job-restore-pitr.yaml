@@ -1,0 +1,54 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sqlite-restore-pitr
+  namespace: pra
+spec:
+  ttlSecondsAfterFinished: 120
+  template:
+    spec:
+      restartPolicy: Never
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: pra-data
+        - name: backup
+          persistentVolumeClaim:
+            claimName: pra-backup
+      containers:
+        - name: restore
+          image: alpine
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+ 
+              echo "=== Fichiers de backup disponibles ==="
+              ls -lht /backup/app-*.db 2>/dev/null || { echo "Aucun backup trouvé !"; exit 1; }
+ 
+              # Si RESTORE_FILE est vide → prend le plus récent
+              if [ -z "$RESTORE_FILE" ]; then
+                TARGET=$(ls -t /backup/app-*.db | head -1)
+                echo "Aucun point spécifié → dernier backup sélectionné"
+              else
+                TARGET="/backup/$RESTORE_FILE"
+                if [ ! -f "$TARGET" ]; then
+                  echo "ERREUR : '$TARGET' introuvable"
+                  ls /backup/
+                  exit 1
+                fi
+                echo "Point de restauration : $RESTORE_FILE"
+              fi
+ 
+              echo "Restauration depuis : $TARGET"
+              cp "$TARGET" /data/app.db
+              echo "=== Restauration terminée ==="
+          env:
+            - name: RESTORE_FILE
+              value: ""
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: backup
+              mountPath: /backup
