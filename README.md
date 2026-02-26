@@ -231,27 +231,48 @@ Faites preuve de pédagogie et soyez clair dans vos explications et procedures d
 **Exercice 1 :**  
 Quels sont les composants dont la perte entraîne une perte de données ?  
   
-*..Répondez à cet exercice ici..*
+Le composants dont la perte entraîne une perte de données sont : le vpc pra-data et pra-backup car les données (la base SQLite) sont stockées sur le volume persistant PVC pra-data. La perte définitive des données ne survient que si les deux volumes (pra-data et pra-backup) sont perdus simultanément, ou si l'infrastructure physique qui les héberge (le cluster K3d local) est totalement détruite sans sauvegarde externe.
+De plus, dans cet atelier,Le disque du nœud Kubernetes : les PVC sont stockés sur le disque local du node (via le storage par défaut de k3d). Donc si : le node est détruit, le disque est corrompu, le cluster est supprimé : Les volumes persistants sont perdus. 
+
 
 **Exercice 2 :**  
 Expliquez nous pourquoi nous n'avons pas perdu les données lors de la supression du PVC pra-data  
   
-*..Répondez à cet exercice ici..*
+Nous ne perdons pas les données car l'atelier met en œuvre une stratégie de sauvegarde régulière.Un CronJob Kubernetes a été configuré pour copier automatiquement le contenu du PVC pra-data vers le PVC pra-backup toutes les minutes. Ainsi, après la suppression du volume de production, il suffit de suivre la procédure de restauration pour copier le dernier backup vers un nouveau volume pra-data
+
 
 **Exercice 3 :**  
 Quels sont les RTO et RPO de cette solution ?  
-  
-*..Répondez à cet exercice ici..*
+ RPO : Il est d'environ 1 minute. C'est l'intervalle de temps entre chaque sauvegarde automatique par le CronJob. En cas de sinistre, vous risquez de perdre au maximum les données saisies depuis la dernière minute.
+• RTO : Il correspond au temps nécessaire pour effectuer la procédure de restauration manuelle. Cela inclut la recréation de l'infrastructure via Ansible et l'exécution des commandes de restauration de la base de données. Dans le cadre de cet atelier, cela prend environ quelques minutes une fois le sinistre identifi
+
 
 **Exercice 4 :**  
 Pourquoi cette solution (cet atelier) ne peux pas être utilisé dans un vrai environnement de production ? Que manque-t-il ?   
   
-*..Répondez à cet exercice ici..*
+Cette solution est adaptée à un atelier pédagogique mais elle présente plusieurs limites importantes pour un environnement de production.
+
+Tout d’abord, l’utilisation de SQLite pose problème. SQLite est une base de données embarquée, non distribuée et non conçue pour des environnements fortement concurrents ou haute disponibilité. Elle ne propose ni réplication ni mécanisme de failover automatique.
+
+Ensuite, le stockage est local au cluster k3d. Les volumes persistants ne sont pas répliqués et dépendent du disque du nœud. En cas de perte du cluster ou du serveur hôte, l’ensemble des données serait perdu.
+
+De plus, les sauvegardes sont stockées dans le même cluster que la base de production. En cas de destruction complète du cluster, les sauvegardes seraient également perdues. Il manque donc une stratégie de sauvegarde externe (type S3, stockage cloud, ou site distant).
+
+Enfin, cette architecture ne comprend pas de supervision, d’alerting, de réplication multi-zone, ni de tests réguliers de restauration. Tous ces éléments sont essentiels en production pour garantir une véritable continuité d’activité.
   
 **Exercice 5 :**  
 Proposez une archtecture plus robuste.   
   
-*..Répondez à cet exercice ici..*
+Pour améliorer cette infrastructure : 
+La base SQLite serait remplacée par une base de données plus adaptée à la production, comme PostgreSQL ou MySQL, idéalement déployée en cluster ou via un service managé (ex : RDS, CloudSQL). Cela permettrait de bénéficier de la réplication et d’un mécanisme de failover automatique.
+
+Le stockage persistant serait assuré par une solution distribuée et répliquée, telle qu’un stockage cloud (EBS, Persistent Disk) ou une solution comme Ceph ou Longhorn. Cela permettrait de résister à la perte d’un nœud.
+
+Les sauvegardes seraient externalisées vers un stockage distant (S3, Azure Blob, Google Cloud Storage), avec gestion de la rétention et du versioning. Ainsi, même en cas de destruction complète du cluster, les données resteraient récupérables.
+
+Enfin, l’architecture intégrerait des outils de monitoring et d’alerting (Prometheus, Grafana, Alertmanager) ainsi que des tests réguliers de restauration pour garantir l’efficacité du PRA.
+
+Cette approche permettrait de disposer d’une solution réellement adaptée à un environnement de production avec haute disponibilité et reprise après sinistre fiable.
 
 ---------------------------------------------------
 Séquence 6 : Ateliers  
